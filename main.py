@@ -13,13 +13,10 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 LIMIT_PER_CAT = 30 
 DELETE_LIMIT = 200 
 
-# --- CẤU HÌNH DANH MỤC (Thêm tham số 'days_old') ---
-# days_old = 0: Chỉ lấy tin hôm nay
-# days_old = 2: Lấy tin hôm nay + 2 ngày trước
 DANH_MUC = [
     {
         "ten": "🌍 TÀI CHÍNH & KINH TẾ THẾ GIỚI",
-        "days_old": 0, # CHỈ LẤY HÔM NAY
+        "days_old": 0,
         "urls": [
             "https://vietstock.vn/773/the-gioi/chung-khoan-the-gioi.rss",
             "https://vietstock.vn/772/the-gioi/tai-chinh-quoc-te.rss",
@@ -35,7 +32,7 @@ DANH_MUC = [
     },
     {
         "ten": "🔥 ĐỊA CHÍNH TRỊ & BẤT ỔN TOÀN CẦU",
-        "days_old": 0, # CHỈ LẤY HÔM NAY
+        "days_old": 0,
         "urls": [
             "https://vnexpress.net/rss/the-gioi.rss",
             "https://tuoitre.vn/rss/the-gioi.rss",
@@ -51,7 +48,7 @@ DANH_MUC = [
     },
     {
         "ten": "📈 CHỨNG KHOÁN & TÀI CHÍNH VIỆT NAM",
-        "days_old": 0, # CHỈ LẤY HÔM NAY
+        "days_old": 0,
         "urls": [
             "https://vietstock.vn/830/chung-khoan/co-phieu.rss",
             "https://vietstock.vn/3358/chung-khoan/etf-va-cac-quy.rss",
@@ -73,7 +70,7 @@ DANH_MUC = [
     },
     {
         "ten": "⚖️ CHÍNH SÁCH THUẾ & LUẬT",
-        "days_old": 2, # LẤY CẢ TIN CŨ (3 ngày)
+        "days_old": 2,
         "urls": [
             "https://thuvienphapluat.vn/rss.xml", 
             "https://vnexpress.net/rss/phap-luat.rss",
@@ -88,7 +85,7 @@ DANH_MUC = [
     },
     {
         "ten": "🛒 THƯƠNG MẠI & KINH DOANH ONLINE",
-        "days_old": 2, # LẤY CẢ TIN CŨ (3 ngày)
+        "days_old": 2,
         "urls": [
             "https://vnexpress.net/rss/kinh-doanh.rss",
             "https://tinhte.vn/rss"
@@ -102,7 +99,7 @@ DANH_MUC = [
     },
     {
         "ten": "📊 SỐ LIỆU & XU HƯỚNG DU LỊCH",
-        "days_old": 2, # LẤY CẢ TIN CŨ (3 ngày)
+        "days_old": 2,
         "urls": [
             "https://thanhnien.vn/rss/du-lich.rss", 
             "https://dantri.com.vn/rss/du-lich.rss", 
@@ -122,87 +119,84 @@ def clean_html(raw_html):
         soup = BeautifulSoup(raw_html, "html.parser")
         for tag in soup(['script', 'style', 'img', 'iframe', 'video', 'a']):
             tag.decompose()
-        
-        text = soup.get_text(separator=" ")
+        text = soup.get_text(separator=" ").strip()
         text = " ".join(text.split())
-        
-        garbage_phrases = ["TTO -", "(Dân trí)", "VTV.vn -", "Báo Đầu tư -", "ANTD.VN -"]
-        for phrase in garbage_phrases:
-            text = text.replace(phrase, "")
-            
-        return text.strip()
-    except:
-        return ""
+        garbage = ["TTO -", "(Dân trí)", "VTV.vn -", "Báo Đầu tư -", "ANTD.VN -"]
+        for g in garbage: text = text.replace(g, "")
+        return text
+    except: return ""
 
 def get_vietnam_time():
-    utc_now = datetime.datetime.utcnow()
-    vn_now = utc_now + datetime.timedelta(hours=7)
-    return vn_now
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=7)
+
+def get_market_data():
+    # === HÀM LẤY GIÁ THỊ TRƯỜNG ===
+    info = ""
+    try:
+        # 1. Lấy giá Bitcoin (API Binance)
+        r = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=5)
+        btc_price = float(r.json()['price'])
+        info += f"🪙 **BTC:** ${btc_price:,.0f}\n"
+    except: info += "🪙 **BTC:** N/A\n"
+
+    try:
+        # 2. Lấy tỷ giá USD (Scrape từ web nhẹ)
+        # (Ở đây dùng API giả lập hoặc scrape đơn giản để demo, thực tế nên dùng nguồn ổn định)
+        # Demo fix cứng hoặc scrape VCB nếu cần. Để đơn giản ta dùng text tượng trưng
+        # hoặc dùng API public khác.
+        pass 
+    except: pass
+    
+    # Trả về header đẹp
+    return f"--------------------\n{info}--------------------"
 
 def check_thoi_gian_hop_le(entry, allowed_days):
-    # allowed_days: Số ngày cũ cho phép (0 là chỉ hôm nay, >0 là cho phép tin cũ)
     try:
         if hasattr(entry, 'published_parsed') and entry.published_parsed:
             dt_utc = datetime.datetime(*entry.published_parsed[:6])
             dt_vn = dt_utc + datetime.timedelta(hours=7)
             vn_now = get_vietnam_time()
             
-            # Nếu allowed_days = 0 (Chỉ lấy hôm nay)
             if allowed_days == 0:
-                if dt_vn.date() == vn_now.date():
-                    return True, dt_vn.strftime("%H:%M") # Chỉ hiện giờ
-                else:
-                    return False, None
-            
-            # Nếu allowed_days > 0 (Cho phép tin cũ)
+                if dt_vn.date() == vn_now.date(): return True, dt_vn.strftime("%H:%M")
+                else: return False, None
             else:
                 delta = vn_now - dt_vn
                 if delta.days <= allowed_days:
-                    # Nếu là hôm nay thì hiện giờ
-                    if dt_vn.date() == vn_now.date():
-                        return True, dt_vn.strftime("%H:%M")
-                    # Nếu tin cũ thì hiện Ngày + Giờ
-                    else:
-                        return True, dt_vn.strftime("%d/%m %H:%M")
-                else:
-                    return False, None
-    except:
-        # Nếu không có ngày tháng, mặc định lấy (để đỡ sót)
-        return True, "Mới"
+                    if dt_vn.date() == vn_now.date(): return True, dt_vn.strftime("%H:%M")
+                    else: return True, dt_vn.strftime("%d/%m %H:%M")
+                else: return False, None
+    except: return True, "Mới"
     return False, None
 
 def don_dep_chat():
     print("🧹 Bắt đầu dọn dẹp...")
     url_send = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
-        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang lọc dữ liệu theo từng danh mục..."}).json()
+        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "🚀 Đang khởi động hệ thống..."}).json()
         if not resp.get("ok"): return
-
         current_id = resp['result']['message_id']
         for i in range(current_id, current_id - DELETE_LIMIT, -1):
-            url_del = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
-            requests.post(url_del, json={"chat_id": TELEGRAM_CHAT_ID, "message_id": i})
-    except Exception as e:
-        print(f"Lỗi dọn dẹp: {e}")
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage", json={"chat_id": TELEGRAM_CHAT_ID, "message_id": i})
+    except: pass
 
 def gui_theo_lo(ds_msg):
     for msg in ds_msg:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        if len(msg) > 4000:
-            parts = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
-            for part in parts:
-                requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": part, "disable_web_page_preview": True, "parse_mode": "Markdown"})
-                time.sleep(1)
-        else:
-            requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "disable_web_page_preview": True, "parse_mode": "Markdown"})
+        parts = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
+        for part in parts:
+            requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": part, "disable_web_page_preview": True, "parse_mode": "Markdown"})
             time.sleep(1)
 
 def xu_ly_tin_tuc():
     vn_now = get_vietnam_time()
     ngay_str = vn_now.strftime("%d/%m/%Y")
     
+    # --- THÊM DASHBOARD VÀO ĐẦU BẢN TIN ---
+    market_info = get_market_data()
+    
     messages_queue = []
-    messages_queue.append(f"📅 **BẢN TIN NGÀY {ngay_str}**")
+    messages_queue.append(f"📅 **BẢN TIN NGÀY {ngay_str}**\n{market_info}")
     
     current_msg = ""
     
@@ -216,7 +210,6 @@ def xu_ly_tin_tuc():
             
         count = 0
         collected_links = set()
-        # Lấy giới hạn ngày của danh mục hiện tại (mặc định là 0 nếu không khai báo)
         days_limit = muc.get("days_old", 0)
         
         for url in muc['urls']:
@@ -230,7 +223,6 @@ def xu_ly_tin_tuc():
                     link = entry.link
                     if link in collected_links: continue
                     
-                    # --- CHECK NGÀY THEO TỪNG DANH MỤC ---
                     hop_le, time_str = check_thoi_gian_hop_le(entry, days_limit)
                     if not hop_le: continue 
                     
@@ -242,7 +234,6 @@ def xu_ly_tin_tuc():
                         text_check = (entry.title + " " + desc_clean).lower()
                         if not any(k in text_check for k in keywords): continue
                     
-                    # Nội dung tin
                     news_item = f"\n🕒 `{time_str}` | **{entry.title}**\n_{desc_clean}_\n👉 [Xem chi tiết]({link})\n"
                     
                     if len(current_msg) + len(news_item) > 3500:
@@ -253,19 +244,14 @@ def xu_ly_tin_tuc():
                     
                     collected_links.add(link)
                     count += 1
-            except Exception as e:
-                print(f"Lỗi đọc RSS {url}: {e}")
+            except: pass
             
         if count == 0:
-            # Thông báo khác nhau tùy theo chế độ
-            if days_limit == 0:
-                current_msg += "\n_(Chưa có tin mới hôm nay)_\n"
-            else:
-                current_msg += "\n_(Không có tin trong 3 ngày qua)_\n"
+            if days_limit == 0: current_msg += "\n_(Chưa có tin mới hôm nay)_\n"
+            else: current_msg += "\n_(Không có tin trong 3 ngày qua)_\n"
 
     if current_msg:
         messages_queue.append(current_msg)
-        
     return messages_queue
 
 def main():
