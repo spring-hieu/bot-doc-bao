@@ -1,18 +1,3 @@
-Hiểu rồi. Đây là yêu cầu hợp lý để cân bằng giữa việc không bỏ sót tin ở các ngành ít tin (Thuế, Du lịch) và không bị spam tin cũ ở các ngành nóng (Tài chính, Chiến sự).
-
-Tôi đã sửa lại code với cơ chế "Tiêu chuẩn kép":
-
-Nhóm 1 (Tài chính, Thế giới, Chứng khoán): Chế độ Strict Mode -> Chỉ lấy tin ĐÚNG NGÀY HÔM NAY.
-
-Nhóm 2 (Thuế, E-com, Du lịch): Chế độ Extended Mode -> Lấy tin trong vòng 3 NGÀY (Hôm nay + 2 ngày trước).
-
-Ông copy đè code này vào main.py là chuẩn chỉ:
-
-code
-Python
-download
-content_copy
-expand_less
 import feedparser
 import requests
 import os
@@ -68,7 +53,6 @@ DANH_MUC = [
         "ten": "📈 CHỨNG KHOÁN & TÀI CHÍNH VIỆT NAM",
         "days_old": 0, # CHỈ LẤY HÔM NAY
         "urls": [
-            "https://cafef.vn/rss/thi-truong-chung-khoan.rss",
             "https://vietstock.vn/830/chung-khoan/co-phieu.rss",
             "https://vietstock.vn/3358/chung-khoan/etf-va-cac-quy.rss",
             "https://vietstock.vn/761/kinh-te/vi-mo.rss",
