@@ -13,7 +13,7 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 LIMIT_PER_CAT = 30 
 DELETE_LIMIT = 200 
 
-# --- CẤU HÌNH DANH MỤC VÀ LINK RSS (ĐÃ CẬP NHẬT THEO YÊU CẦU) ---
+# --- DANH MỤC LINK RSS ---
 DANH_MUC = [
     {
         "ten": "🌍 TÀI CHÍNH & KINH TẾ THẾ GIỚI",
@@ -32,7 +32,6 @@ DANH_MUC = [
     },
     {
         "ten": "🔥 ĐỊA CHÍNH TRỊ & BẤT ỔN TOÀN CẦU",
-        # Giữ lại nguồn tin thế giới uy tín để lọc tin chiến sự
         "urls": [
             "https://vnexpress.net/rss/the-gioi.rss",
             "https://tuoitre.vn/rss/the-gioi.rss",
@@ -70,7 +69,7 @@ DANH_MUC = [
     {
         "ten": "⚖️ CHÍNH SÁCH THUẾ & LUẬT",
         "urls": [
-            "https://thuvienphapluat.vn/rss.xml", # Link tổng hợp
+            "https://thuvienphapluat.vn/rss.xml", 
             "https://vnexpress.net/rss/phap-luat.rss",
             "https://dantri.com.vn/rss/phap-luat.rss"
         ],
@@ -85,7 +84,7 @@ DANH_MUC = [
         "ten": "🛒 THƯƠNG MẠI & KINH DOANH ONLINE",
         "urls": [
             "https://vnexpress.net/rss/kinh-doanh.rss",
-            "https://tinhte.vn/rss" # Link này nhiều tin công nghệ, cần lọc kỹ
+            "https://tinhte.vn/rss"
         ],
         "keywords": [
             "thương mại điện tử", "e-commerce", "mua sắm trực tuyến", "online", "bán lẻ",
@@ -113,14 +112,12 @@ DANH_MUC = [
 def clean_html(raw_html):
     try:
         soup = BeautifulSoup(raw_html, "html.parser")
-        # Xóa hết ảnh, link, video để tin nhắn gọn gàng
         for tag in soup(['script', 'style', 'img', 'iframe', 'video', 'a']):
             tag.decompose()
         
         text = soup.get_text(separator=" ")
         text = " ".join(text.split())
         
-        # Xóa các cụm từ thừa
         garbage_phrases = ["TTO -", "(Dân trí)", "VTV.vn -", "Báo Đầu tư -", "ANTD.VN -"]
         for phrase in garbage_phrases:
             text = text.replace(phrase, "")
@@ -129,24 +126,45 @@ def clean_html(raw_html):
     except:
         return ""
 
-def convert_time(entry):
+def get_vietnam_time():
+    # Lấy giờ hiện tại của Việt Nam
+    utc_now = datetime.datetime.utcnow()
+    vn_now = utc_now + datetime.timedelta(hours=7)
+    return vn_now
+
+def check_ngay_hien_tai(entry):
+    # Hàm kiểm tra xem bài báo có phải là hôm nay không
     try:
-        if hasattr(entry, 'published_parsed'):
-            dt_utc = datetime.datetime.fromtimestamp(mktime(entry.published_parsed))
+        if hasattr(entry, 'published_parsed') and entry.published_parsed:
+            # Lấy thời gian bài báo (UTC)
+            # entry.published_parsed là một struct_time (tuple 9 phần tử)
+            # Chỉ lấy 6 phần tử đầu để tạo datetime
+            dt_utc = datetime.datetime(*entry.published_parsed[:6])
+            
+            # Chuyển sang giờ Việt Nam (+7)
             dt_vn = dt_utc + datetime.timedelta(hours=7)
-            return dt_vn.strftime("%H:%M")
-    except: pass
-    return "Mới"
+            
+            # Lấy ngày hiện tại ở VN
+            vn_now = get_vietnam_time()
+            
+            # So sánh ngày/tháng/năm
+            if dt_vn.date() == vn_now.date():
+                return True, dt_vn.strftime("%H:%M") # Trả về True và Giờ
+            else:
+                return False, None
+    except:
+        # Nếu RSS lỗi không có ngày, mặc định bỏ qua cho an toàn
+        pass
+    return False, None
 
 def don_dep_chat():
     print("🧹 Bắt đầu dọn dẹp...")
     url_send = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
-        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang tổng hợp dữ liệu từ Vietstock & RSS..."}).json()
+        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang lọc tin tức mới nhất HÔM NAY..."}).json()
         if not resp.get("ok"): return
 
         current_id = resp['result']['message_id']
-        # Xóa 200 tin gần nhất
         for i in range(current_id, current_id - DELETE_LIMIT, -1):
             url_del = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
             requests.post(url_del, json={"chat_id": TELEGRAM_CHAT_ID, "message_id": i})
@@ -156,7 +174,6 @@ def don_dep_chat():
 def gui_theo_lo(ds_msg):
     for msg in ds_msg:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        # Cắt nhỏ tin nhắn nếu quá dài
         if len(msg) > 4000:
             parts = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
             for part in parts:
@@ -167,9 +184,11 @@ def gui_theo_lo(ds_msg):
             time.sleep(1)
 
 def xu_ly_tin_tuc():
-    ngay = datetime.datetime.now().strftime("%d/%m/%Y")
+    vn_now = get_vietnam_time()
+    ngay_str = vn_now.strftime("%d/%m/%Y")
+    
     messages_queue = []
-    messages_queue.append(f"📅 **BẢN TIN NGÀY {ngay}**")
+    messages_queue.append(f"📅 **BẢN TIN NGÀY {ngay_str}**")
     
     current_msg = ""
     
@@ -195,6 +214,13 @@ def xu_ly_tin_tuc():
                     link = entry.link
                     if link in collected_links: continue
                     
+                    # --- KIỂM TRA NGÀY (QUAN TRỌNG) ---
+                    is_today, time_str = check_ngay_hien_tai(entry)
+                    
+                    # Nếu không phải hôm nay thì BỎ QUA NGAY
+                    if not is_today:
+                        continue 
+                    
                     keywords = muc.get('keywords', [])
                     desc_raw = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
                     desc_clean = clean_html(desc_raw)
@@ -202,8 +228,6 @@ def xu_ly_tin_tuc():
                     if keywords:
                         text_check = (entry.title + " " + desc_clean).lower()
                         if not any(k in text_check for k in keywords): continue
-                    
-                    time_str = convert_time(entry)
                     
                     # Nội dung tin hiển thị
                     news_item = f"\n🕒 `{time_str}` | **{entry.title}**\n_{desc_clean}_\n👉 [Xem chi tiết]({link})\n"
@@ -220,7 +244,7 @@ def xu_ly_tin_tuc():
                 print(f"Lỗi đọc RSS {url}: {e}")
             
         if count == 0:
-            current_msg += "\n_(Chưa có tin mới phù hợp)_\n"
+            current_msg += "\n_(Chưa có tin mới trong ngày)_\n"
 
     if current_msg:
         messages_queue.append(current_msg)
