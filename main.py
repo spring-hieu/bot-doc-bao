@@ -12,8 +12,9 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 LIMIT_PER_CAT = 30 
 DELETE_LIMIT = 200 
+# Cho phép lấy tin cũ tối đa bao nhiêu ngày? (2 ngày)
+MAX_DAYS_OLD = 2 
 
-# --- DANH MỤC LINK RSS ---
 DANH_MUC = [
     {
         "ten": "🌍 TÀI CHÍNH & KINH TẾ THẾ GIỚI",
@@ -48,6 +49,7 @@ DANH_MUC = [
     {
         "ten": "📈 CHỨNG KHOÁN & TÀI CHÍNH VIỆT NAM",
         "urls": [
+            "https://cafef.vn/rss/thi-truong-chung-khoan.rss",
             "https://vietstock.vn/830/chung-khoan/co-phieu.rss",
             "https://vietstock.vn/3358/chung-khoan/etf-va-cac-quy.rss",
             "https://vietstock.vn/761/kinh-te/vi-mo.rss",
@@ -127,41 +129,44 @@ def clean_html(raw_html):
         return ""
 
 def get_vietnam_time():
-    # Lấy giờ hiện tại của Việt Nam
     utc_now = datetime.datetime.utcnow()
     vn_now = utc_now + datetime.timedelta(hours=7)
     return vn_now
 
-def check_ngay_hien_tai(entry):
-    # Hàm kiểm tra xem bài báo có phải là hôm nay không
+def check_thoi_gian_hop_le(entry):
+    # Hàm kiểm tra thời gian: Lấy tin trong vòng MAX_DAYS_OLD ngày
     try:
         if hasattr(entry, 'published_parsed') and entry.published_parsed:
             # Lấy thời gian bài báo (UTC)
-            # entry.published_parsed là một struct_time (tuple 9 phần tử)
-            # Chỉ lấy 6 phần tử đầu để tạo datetime
             dt_utc = datetime.datetime(*entry.published_parsed[:6])
-            
             # Chuyển sang giờ Việt Nam (+7)
             dt_vn = dt_utc + datetime.timedelta(hours=7)
-            
-            # Lấy ngày hiện tại ở VN
             vn_now = get_vietnam_time()
             
-            # So sánh ngày/tháng/năm
-            if dt_vn.date() == vn_now.date():
-                return True, dt_vn.strftime("%H:%M") # Trả về True và Giờ
+            # Tính khoảng cách thời gian
+            delta = vn_now - dt_vn
+            
+            # Nếu tin trong vòng 48h (2 ngày) -> LẤY
+            if delta.days < MAX_DAYS_OLD:
+                # Format hiển thị
+                if dt_vn.date() == vn_now.date():
+                    # Nếu là hôm nay thì chỉ hiện giờ
+                    return True, dt_vn.strftime("%H:%M") 
+                else:
+                    # Nếu là hôm qua/kia thì hiện Ngày + Giờ để phân biệt
+                    return True, dt_vn.strftime("%d/%m %H:%M")
             else:
                 return False, None
     except:
-        # Nếu RSS lỗi không có ngày, mặc định bỏ qua cho an toàn
-        pass
+        # Nếu RSS không có ngày tháng thì mặc định cứ lấy (chấp nhận rủi ro tin cũ)
+        return True, "Mới"
     return False, None
 
 def don_dep_chat():
     print("🧹 Bắt đầu dọn dẹp...")
     url_send = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
-        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang lọc tin tức mới nhất HÔM NAY..."}).json()
+        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang tổng hợp tin (48h qua)..."}).json()
         if not resp.get("ok"): return
 
         current_id = resp['result']['message_id']
@@ -214,12 +219,9 @@ def xu_ly_tin_tuc():
                     link = entry.link
                     if link in collected_links: continue
                     
-                    # --- KIỂM TRA NGÀY (QUAN TRỌNG) ---
-                    is_today, time_str = check_ngay_hien_tai(entry)
-                    
-                    # Nếu không phải hôm nay thì BỎ QUA NGAY
-                    if not is_today:
-                        continue 
+                    # --- KIỂM TRA NGÀY (Nới lỏng 2 ngày) ---
+                    hop_le, time_str = check_thoi_gian_hop_le(entry)
+                    if not hop_le: continue 
                     
                     keywords = muc.get('keywords', [])
                     desc_raw = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
@@ -244,7 +246,7 @@ def xu_ly_tin_tuc():
                 print(f"Lỗi đọc RSS {url}: {e}")
             
         if count == 0:
-            current_msg += "\n_(Chưa có tin mới trong ngày)_\n"
+            current_msg += "\n_(Chưa có tin mới trong 48h)_\n"
 
     if current_msg:
         messages_queue.append(current_msg)
