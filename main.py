@@ -10,11 +10,10 @@ from bs4 import BeautifulSoup
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# SỐ LƯỢNG TIN: 30 tin mỗi mục
+# Số lượng tin mỗi mục
 LIMIT_PER_CAT = 30 
-DELETE_LIMIT = 200 # Tăng số lượng tin xóa cũ lên để đảm bảo sạch sẽ
+DELETE_LIMIT = 200 
 
-# CẤU HÌNH DANH MỤC & TỪ KHÓA CHUYÊN SÂU
 DANH_MUC = [
     {
         "ten": "🌍 TÀI CHÍNH & KINH TẾ THẾ GIỚI",
@@ -24,7 +23,6 @@ DANH_MUC = [
             "https://vneconomy.vn/timeline/9920/the-gioi.htm",
             "https://bnews.vn/rss/the-gioi.rss"
         ],
-        # Từ khóa bao trùm FED, Vàng, Dầu, Crypto, Tỷ giá...
         "keywords": [
             "fed", "cục dự trữ liên bang", "lãi suất", "lạm phát", "gdp", "cpi", "pmi",
             "usd", "tỷ giá", "yên nhật", "nhân dân tệ", "eur", "vàng", "dầu", "năng lượng",
@@ -40,7 +38,6 @@ DANH_MUC = [
             "https://thanhnien.vn/rss/the-gioi.rss",
             "https://tuoitre.vn/rss/the-gioi.rss"
         ],
-        # Từ khóa về xung đột, quân sự, bầu cử
         "keywords": [
             "xung đột", "chiến tranh", "quân sự", "giao tranh", "tấn công", "khủng bố",
             "biểu tình", "bạo loạn", "đảo chính", "bầu cử", "tổng thống", "thủ tướng",
@@ -57,13 +54,12 @@ DANH_MUC = [
             "https://tinnhanhchungkhoan.vn/rss/chung-khoan.rss",
             "https://vneconomy.vn/timeline/6/chung-khoan.htm"
         ],
-        # Từ khóa phân tích, mã cổ phiếu, báo cáo
         "keywords": [
             "vn-index", "vnindex", "hnx", "upcom", "cổ phiếu", "chứng khoán", "thanh khoản",
             "khối ngoại", "tự doanh", "lợi nhuận", "thua lỗ", "báo cáo tài chính", "cổ tức",
             "ngân hàng", "bất động sản", "trái phiếu", "đáo hạn", "vốn hóa", "ipo",
             "nhận định", "phân tích", "khuyến nghị", "bắt đáy", "chốt lời", "margin",
-            "hpg", "vcb", "ssi", "vic", "vhm", "fpt", "mwg" # Các mã bluechip ví dụ
+            "hpg", "vcb", "ssi", "vic", "vhm", "fpt", "mwg"
         ]
     },
     {
@@ -74,7 +70,6 @@ DANH_MUC = [
             "https://cafef.vn/vi-mo-dau-tu.rss",
             "https://tapchitaichinh.vn/co-che-chinh-sach.rss"
         ],
-        # Từ khóa chuyên về Thuế
         "keywords": [
             "thuế", "vat", "thuế thu nhập", "thuế tndn", "thuế tncn", "hoàn thuế",
             "tổng cục thuế", "bộ tài chính", "hải quan", "nghị định", "thông tư", "luật",
@@ -89,7 +84,6 @@ DANH_MUC = [
             "https://vnexpress.net/rss/kinh-doanh.rss",
             "https://vneconomy.vn/timeline/99/tieu-dung.htm"
         ],
-        # Từ khóa về E-com, Logistics, Bán lẻ online
         "keywords": [
             "thương mại điện tử", "e-commerce", "mua sắm trực tuyến", "online", "bán lẻ",
             "shopee", "lazada", "tiki", "tiktok shop", "amazon", "alibaba", "temu",
@@ -104,7 +98,6 @@ DANH_MUC = [
             "https://tcdulichphat.com/rss/home", 
             "https://baodautu.vn/du-lich.rss"
         ],
-        # Từ khóa tập trung vào BÁO CÁO, SỐ LIỆU (Loại bỏ tin review ăn chơi)
         "keywords": [
             "số liệu", "thống kê", "báo cáo", "doanh thu", "lượt khách", "khách quốc tế",
             "khách nội địa", "lữ hành", "hàng không", "vé máy bay", "cục du lịch", "visa",
@@ -115,15 +108,29 @@ DANH_MUC = [
 ]
 
 def clean_html(raw_html):
-    # Làm sạch thẻ HTML nhưng giữ lại text dài
+    # --- CẢI TIẾN MỚI ---
     try:
-        soup = BeautifulSoup(raw_html, "lxml")
-        text = soup.get_text(separator=" ").strip()
-        # Xóa các cụm từ thừa thường gặp trong RSS
-        text = text.replace("TTO -", "").replace("(Dân trí)", "").strip()
-        return text
+        # Dùng html.parser (có sẵn) để tránh lỗi kén thư viện
+        soup = BeautifulSoup(raw_html, "html.parser")
+        
+        # 1. Hủy diệt các thẻ không mong muốn (Ảnh, Script, Style, Iframe)
+        for tag in soup(['script', 'style', 'img', 'iframe', 'video']):
+            tag.decompose()
+            
+        # 2. Lấy text thuần túy
+        text = soup.get_text(separator=" ")
+        
+        # 3. Xử lý khoảng trắng thừa (biến "   abc   " thành "abc")
+        text = " ".join(text.split())
+        
+        # 4. Xóa các cụm từ rác thường gặp ở đầu tin
+        garbage_phrases = ["TTO -", "(Dân trí)", "VTV.vn -", "Báo Đầu tư -"]
+        for phrase in garbage_phrases:
+            text = text.replace(phrase, "")
+            
+        return text.strip()
     except:
-        return raw_html
+        return "" # Nếu lỗi quá thì trả về rỗng để đỡ rác màn hình
 
 def convert_time(entry):
     try:
@@ -135,28 +142,24 @@ def convert_time(entry):
     return "Mới"
 
 def don_dep_chat():
-    print("🧹 Đang dọn dẹp sạch sẽ tin cũ...")
+    print("🧹 Bắt đầu dọn dẹp...")
     url_send = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
-        # Gửi tin mồi
-        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang tổng hợp 180 tin tức..."}).json()
+        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang xử lý dữ liệu..."}).json()
         if not resp.get("ok"): return
 
         current_id = resp['result']['message_id']
-        # Xóa ngược về quá khứ
         for i in range(current_id, current_id - DELETE_LIMIT, -1):
             url_del = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
             requests.post(url_del, json={"chat_id": TELEGRAM_CHAT_ID, "message_id": i})
-            
     except Exception as e:
         print(f"Lỗi dọn dẹp: {e}")
 
 def gui_theo_lo(ds_msg):
-    # Hàm gửi tin nhắn, tự động chia nhỏ nếu quá dài
     for msg in ds_msg:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         
-        # Nếu tin nhắn quá dài (Telegram giới hạn 4096 ký tự), cắt đôi ra
+        # Chia nhỏ nếu quá dài
         if len(msg) > 4000:
             parts = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
             for part in parts:
@@ -166,12 +169,12 @@ def gui_theo_lo(ds_msg):
                     "disable_web_page_preview": True,
                     "parse_mode": "Markdown"
                 })
-                time.sleep(1) # Nghỉ xíu tránh bị spam
+                time.sleep(1)
         else:
             requests.post(url, json={
                 "chat_id": TELEGRAM_CHAT_ID, 
                 "text": msg, 
-                "disable_web_page_preview": True,
+                "disable_web_page_preview": True, 
                 "parse_mode": "Markdown"
             })
             time.sleep(1)
@@ -179,16 +182,12 @@ def gui_theo_lo(ds_msg):
 def xu_ly_tin_tuc():
     ngay = datetime.datetime.now().strftime("%d/%m/%Y")
     messages_queue = []
-    
-    # Header đầu tiên
-    messages_queue.append(f"📅 **BÁO CÁO TOÀN CẢNH NGÀY {ngay}**\n_Chế độ: 30 tin/mục - Mô tả chi tiết_")
+    messages_queue.append(f"📅 **BẢN TIN NGÀY {ngay}**")
     
     current_msg = ""
     
     for muc in DANH_MUC:
         header = f"\n➖➖➖➖➖➖➖➖➖➖\n**{muc['ten']}**\n"
-        
-        # Nếu đang gom dở mà thêm header bị dài quá thì ngắt luôn
         if len(current_msg) + len(header) > 3000:
             messages_queue.append(current_msg)
             current_msg = header
@@ -207,10 +206,11 @@ def xu_ly_tin_tuc():
                     link = entry.link
                     if link in collected_links: continue
                     
-                    # Lọc từ khóa
                     keywords = muc.get('keywords', [])
                     desc_raw = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
-                    desc_clean = clean_html(desc_raw) # Lấy toàn bộ mô tả
+                    
+                    # --- GỌI HÀM LÀM SẠCH MỚI ---
+                    desc_clean = clean_html(desc_raw)
                     
                     # Kiểm tra từ khóa
                     if keywords:
@@ -219,13 +219,12 @@ def xu_ly_tin_tuc():
                     
                     time_str = convert_time(entry)
                     
-                    # Nội dung tin (Title in đậm, Mô tả để thường cho dễ đọc)
-                    news_item = f"\n🕒 `{time_str}` | **{entry.title}**\n{desc_clean}\n👉 [Xem chi tiết]({link})\n"
+                    # Format tin nhắn gọn gàng: Tiêu đề đậm, Mô tả nghiêng
+                    news_item = f"\n🕒 `{time_str}` | **{entry.title}**\n_{desc_clean}_\n👉 [Xem chi tiết]({link})\n"
                     
-                    # Kiểm tra độ dài an toàn (3500 ký tự để trừ hao)
                     if len(current_msg) + len(news_item) > 3500:
                         messages_queue.append(current_msg)
-                        current_msg = news_item # Bắt đầu tin mới
+                        current_msg = news_item 
                     else:
                         current_msg += news_item
                     
@@ -234,26 +233,17 @@ def xu_ly_tin_tuc():
             except: pass
             
         if count == 0:
-            current_msg += "\n_(Không có dữ liệu phù hợp)_\n"
+            current_msg += "\n_(Không có tin mới)_\n"
 
-    # Đẩy nốt phần còn dư
     if current_msg:
         messages_queue.append(current_msg)
         
     return messages_queue
 
 def main():
-    if not TELEGRAM_TOKEN:
-        print("Chưa cấu hình Token!")
-        return
-    
-    # 1. Dọn dẹp
+    if not TELEGRAM_TOKEN: return
     don_dep_chat()
-    
-    # 2. Xử lý
     ds_tin = xu_ly_tin_tuc()
-    
-    # 3. Gửi
     gui_theo_lo(ds_tin)
 
 if __name__ == "__main__":
