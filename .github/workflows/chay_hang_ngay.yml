@@ -2,9 +2,8 @@ name: Bot Chạy Hàng Ngày
 
 on:
   schedule:
-    # 5h sáng UTC = 12h trưa Việt Nam
-    - cron: '0 5 * * *'
-  workflow_dispatch: # Giữ cái này để thích thì bấm nút chạy tay
+    - cron: '0 5 * * *' # 12h trưa VN
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -29,3 +28,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
+
+      # --- THUỐC CHỐNG NGỦ ĐÔNG ---
+      - name: Keepalive Workflow
+        uses: gautamkrishnar/keepalive-workflow@v1
