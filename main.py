@@ -10,21 +10,20 @@ from bs4 import BeautifulSoup
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# Số lượng tin mỗi mục
 LIMIT_PER_CAT = 30 
 DELETE_LIMIT = 200 
 
+# --- CẤU HÌNH DANH MỤC VÀ LINK RSS (ĐÃ CẬP NHẬT THEO YÊU CẦU) ---
 DANH_MUC = [
     {
         "ten": "🌍 TÀI CHÍNH & KINH TẾ THẾ GIỚI",
         "urls": [
-            "https://cafef.vn/tai-chinh-quoc-te.rss",
-            "https://vnexpress.net/rss/the-gioi.rss",
-            "https://vneconomy.vn/timeline/9920/the-gioi.htm",
-            "https://bnews.vn/rss/the-gioi.rss"
+            "https://vietstock.vn/773/the-gioi/chung-khoan-the-gioi.rss",
+            "https://vietstock.vn/772/the-gioi/tai-chinh-quoc-te.rss",
+            "https://vnexpress.net/rss/the-gioi.rss"
         ],
         "keywords": [
-            "fed", "cục dự trữ liên bang", "lãi suất", "lạm phát", "gdp", "cpi", "pmi",
+            "fed", "cục dự trữ", "lãi suất", "lạm phát", "gdp", "cpi", "pmi",
             "usd", "tỷ giá", "yên nhật", "nhân dân tệ", "eur", "vàng", "dầu", "năng lượng",
             "world bank", "imf", "ecb", "suy thoái", "khủng hoảng", "bitcoin", "crypto",
             "chứng khoán mỹ", "wall street", "dow jones", "nasdaq", "s&p 500",
@@ -33,10 +32,11 @@ DANH_MUC = [
     },
     {
         "ten": "🔥 ĐỊA CHÍNH TRỊ & BẤT ỔN TOÀN CẦU",
+        # Giữ lại nguồn tin thế giới uy tín để lọc tin chiến sự
         "urls": [
             "https://vnexpress.net/rss/the-gioi.rss",
-            "https://thanhnien.vn/rss/the-gioi.rss",
-            "https://tuoitre.vn/rss/the-gioi.rss"
+            "https://tuoitre.vn/rss/the-gioi.rss",
+            "https://thanhnien.vn/rss/the-gioi.rss"
         ],
         "keywords": [
             "xung đột", "chiến tranh", "quân sự", "giao tranh", "tấn công", "khủng bố",
@@ -49,26 +49,30 @@ DANH_MUC = [
     {
         "ten": "📈 CHỨNG KHOÁN & TÀI CHÍNH VIỆT NAM",
         "urls": [
-            "https://cafef.vn/tai-chinh-chung-khoan.rss",
-            "https://vietstock.vn/rss/chung-khoan.rss",
-            "https://tinnhanhchungkhoan.vn/rss/chung-khoan.rss",
-            "https://vneconomy.vn/timeline/6/chung-khoan.htm"
+            "https://vietstock.vn/830/chung-khoan/co-phieu.rss",
+            "https://vietstock.vn/3358/chung-khoan/etf-va-cac-quy.rss",
+            "https://vietstock.vn/761/kinh-te/vi-mo.rss",
+            "https://vietstock.vn/757/tai-chinh/ngan-hang.rss",
+            "https://vietstock.vn/737/doanh-nghiep/hoat-dong-kinh-doanh.rss",
+            "https://vietstock.vn/759/hang-hoa/vang-va-kim-loai-quy.rss",
+            "https://vietstock.vn/1636/nhan-dinh-phan-tich/nhan-dinh-thi-truong.rss",
+            "https://vietstock.vn/582/nhan-dinh-phan-tich/phan-tich-co-ban.rss",
+            "https://vietstock.vn/585/nhan-dinh-phan-tich/phan-tich-ky-thuat.rss"
         ],
         "keywords": [
             "vn-index", "vnindex", "hnx", "upcom", "cổ phiếu", "chứng khoán", "thanh khoản",
             "khối ngoại", "tự doanh", "lợi nhuận", "thua lỗ", "báo cáo tài chính", "cổ tức",
             "ngân hàng", "bất động sản", "trái phiếu", "đáo hạn", "vốn hóa", "ipo",
             "nhận định", "phân tích", "khuyến nghị", "bắt đáy", "chốt lời", "margin",
-            "hpg", "vcb", "ssi", "vic", "vhm", "fpt", "mwg"
+            "kỹ thuật", "cơ bản", "etf", "quỹ", "vàng", "sjc"
         ]
     },
     {
         "ten": "⚖️ CHÍNH SÁCH THUẾ & LUẬT",
         "urls": [
-            "https://thuvienphapluat.vn/rss/van-ban-moi.xml",
+            "https://thuvienphapluat.vn/rss.xml", # Link tổng hợp
             "https://vnexpress.net/rss/phap-luat.rss",
-            "https://cafef.vn/vi-mo-dau-tu.rss",
-            "https://tapchitaichinh.vn/co-che-chinh-sach.rss"
+            "https://dantri.com.vn/rss/phap-luat.rss"
         ],
         "keywords": [
             "thuế", "vat", "thuế thu nhập", "thuế tndn", "thuế tncn", "hoàn thuế",
@@ -78,11 +82,10 @@ DANH_MUC = [
         ]
     },
     {
-        "ten": "🛒 THƯƠNG MẠI ĐIỆN TỬ (E-COM)",
+        "ten": "🛒 THƯƠNG MẠI & KINH DOANH ONLINE",
         "urls": [
-            "https://cafebiz.vn/cong-nghe.rss",
             "https://vnexpress.net/rss/kinh-doanh.rss",
-            "https://vneconomy.vn/timeline/99/tieu-dung.htm"
+            "https://tinhte.vn/rss" # Link này nhiều tin công nghệ, cần lọc kỹ
         ],
         "keywords": [
             "thương mại điện tử", "e-commerce", "mua sắm trực tuyến", "online", "bán lẻ",
@@ -94,9 +97,9 @@ DANH_MUC = [
     {
         "ten": "📊 SỐ LIỆU & XU HƯỚNG DU LỊCH",
         "urls": [
-            "https://vnexpress.net/rss/du-lich.rss",
-            "https://tcdulichphat.com/rss/home", 
-            "https://baodautu.vn/du-lich.rss"
+            "https://thanhnien.vn/rss/du-lich.rss", 
+            "https://dantri.com.vn/rss/du-lich.rss", 
+            "https://tuoitre.vn/rss/du-lich.rss"
         ],
         "keywords": [
             "số liệu", "thống kê", "báo cáo", "doanh thu", "lượt khách", "khách quốc tế",
@@ -108,29 +111,23 @@ DANH_MUC = [
 ]
 
 def clean_html(raw_html):
-    # --- CẢI TIẾN MỚI ---
     try:
-        # Dùng html.parser (có sẵn) để tránh lỗi kén thư viện
         soup = BeautifulSoup(raw_html, "html.parser")
-        
-        # 1. Hủy diệt các thẻ không mong muốn (Ảnh, Script, Style, Iframe)
-        for tag in soup(['script', 'style', 'img', 'iframe', 'video']):
+        # Xóa hết ảnh, link, video để tin nhắn gọn gàng
+        for tag in soup(['script', 'style', 'img', 'iframe', 'video', 'a']):
             tag.decompose()
-            
-        # 2. Lấy text thuần túy
-        text = soup.get_text(separator=" ")
         
-        # 3. Xử lý khoảng trắng thừa (biến "   abc   " thành "abc")
+        text = soup.get_text(separator=" ")
         text = " ".join(text.split())
         
-        # 4. Xóa các cụm từ rác thường gặp ở đầu tin
-        garbage_phrases = ["TTO -", "(Dân trí)", "VTV.vn -", "Báo Đầu tư -"]
+        # Xóa các cụm từ thừa
+        garbage_phrases = ["TTO -", "(Dân trí)", "VTV.vn -", "Báo Đầu tư -", "ANTD.VN -"]
         for phrase in garbage_phrases:
             text = text.replace(phrase, "")
             
         return text.strip()
     except:
-        return "" # Nếu lỗi quá thì trả về rỗng để đỡ rác màn hình
+        return ""
 
 def convert_time(entry):
     try:
@@ -145,10 +142,11 @@ def don_dep_chat():
     print("🧹 Bắt đầu dọn dẹp...")
     url_send = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
-        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang xử lý dữ liệu..."}).json()
+        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang tổng hợp dữ liệu từ Vietstock & RSS..."}).json()
         if not resp.get("ok"): return
 
         current_id = resp['result']['message_id']
+        # Xóa 200 tin gần nhất
         for i in range(current_id, current_id - DELETE_LIMIT, -1):
             url_del = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
             requests.post(url_del, json={"chat_id": TELEGRAM_CHAT_ID, "message_id": i})
@@ -158,25 +156,14 @@ def don_dep_chat():
 def gui_theo_lo(ds_msg):
     for msg in ds_msg:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        
-        # Chia nhỏ nếu quá dài
+        # Cắt nhỏ tin nhắn nếu quá dài
         if len(msg) > 4000:
             parts = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
             for part in parts:
-                requests.post(url, json={
-                    "chat_id": TELEGRAM_CHAT_ID, 
-                    "text": part, 
-                    "disable_web_page_preview": True,
-                    "parse_mode": "Markdown"
-                })
+                requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": part, "disable_web_page_preview": True, "parse_mode": "Markdown"})
                 time.sleep(1)
         else:
-            requests.post(url, json={
-                "chat_id": TELEGRAM_CHAT_ID, 
-                "text": msg, 
-                "disable_web_page_preview": True, 
-                "parse_mode": "Markdown"
-            })
+            requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "disable_web_page_preview": True, "parse_mode": "Markdown"})
             time.sleep(1)
 
 def xu_ly_tin_tuc():
@@ -201,6 +188,8 @@ def xu_ly_tin_tuc():
             if count >= LIMIT_PER_CAT: break
             try:
                 feed = feedparser.parse(url)
+                if not feed.entries: continue 
+
                 for entry in feed.entries:
                     if count >= LIMIT_PER_CAT: break
                     link = entry.link
@@ -208,18 +197,15 @@ def xu_ly_tin_tuc():
                     
                     keywords = muc.get('keywords', [])
                     desc_raw = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
-                    
-                    # --- GỌI HÀM LÀM SẠCH MỚI ---
                     desc_clean = clean_html(desc_raw)
                     
-                    # Kiểm tra từ khóa
                     if keywords:
                         text_check = (entry.title + " " + desc_clean).lower()
                         if not any(k in text_check for k in keywords): continue
                     
                     time_str = convert_time(entry)
                     
-                    # Format tin nhắn gọn gàng: Tiêu đề đậm, Mô tả nghiêng
+                    # Nội dung tin hiển thị
                     news_item = f"\n🕒 `{time_str}` | **{entry.title}**\n_{desc_clean}_\n👉 [Xem chi tiết]({link})\n"
                     
                     if len(current_msg) + len(news_item) > 3500:
@@ -230,10 +216,11 @@ def xu_ly_tin_tuc():
                     
                     collected_links.add(link)
                     count += 1
-            except: pass
+            except Exception as e:
+                print(f"Lỗi đọc RSS {url}: {e}")
             
         if count == 0:
-            current_msg += "\n_(Không có tin mới)_\n"
+            current_msg += "\n_(Chưa có tin mới phù hợp)_\n"
 
     if current_msg:
         messages_queue.append(current_msg)
