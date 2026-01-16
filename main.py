@@ -49,7 +49,6 @@ DANH_MUC = [
     {
         "ten": "📈 CHỨNG KHOÁN & TÀI CHÍNH VIỆT NAM",
         "urls": [
-            "https://cafef.vn/rss/thi-truong-chung-khoan.rss",
             "https://vietstock.vn/830/chung-khoan/co-phieu.rss",
             "https://vietstock.vn/3358/chung-khoan/etf-va-cac-quy.rss",
             "https://vietstock.vn/761/kinh-te/vi-mo.rss",
