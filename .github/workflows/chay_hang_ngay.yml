@@ -2,8 +2,12 @@ name: Bot Chạy Hàng Ngày
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 7h sáng VN
-  workflow_dispatch: # Nút chạy thủ công
+    # 5h sáng UTC = 12h trưa Việt Nam
+    - cron: '0 5 * * *'
+  workflow_dispatch: # Giữ cái này để thích thì bấm nút chạy tay
+
+permissions:
+  contents: write
 
 jobs:
   run-bot:
