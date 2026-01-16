@@ -2,16 +2,17 @@ import feedparser
 import requests
 import os
 import datetime
-import json
-from bs4 import BeautifulSoup
 from time import mktime
+from bs4 import BeautifulSoup
 
 # --- CẤU HÌNH ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-HISTORY_FILE = "history.json" # Cuốn sổ tay ghi nhớ
 
-LIMIT_PER_CAT = 15 # Số tin mỗi mục
+# Số lượng tin nhắn muốn quét ngược về quá khứ để xóa
+# 100 là đủ sạch cho cả ngày hôm trước. Nếu nhiều hơn thì tăng lên.
+DELETE_LIMIT = 100 
+LIMIT_PER_CAT = 15
 
 DANH_MUC = [
     {
@@ -54,60 +55,47 @@ def clean_html(raw_html):
         return raw_html
 
 def convert_time(entry):
-    # Hàm chuyển đổi giờ RSS sang giờ Việt Nam (UTC+7)
     try:
         if hasattr(entry, 'published_parsed'):
-            # Lấy giờ gốc (UTC)
             dt_utc = datetime.datetime.fromtimestamp(mktime(entry.published_parsed))
-            # Cộng thêm 7 tiếng
             dt_vn = dt_utc + datetime.timedelta(hours=7)
-            return dt_vn.strftime("%H:%M") # Trả về dạng 14:30
-    except:
-        pass
+            return dt_vn.strftime("%H:%M")
+    except: pass
     return "Mới"
 
-def xoa_tin_nhan_cu():
-    # Đọc file lịch sử để xóa tin hôm qua
-    if not os.path.exists(HISTORY_FILE):
-        return
+def don_dep_chat():
+    print("🧹 Bắt đầu dọn dẹp tin nhắn cũ...")
     
+    # 1. Gửi một tin nhắn mồi để lấy ID hiện tại
+    url_send = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
-        with open(HISTORY_FILE, 'r') as f:
-            old_ids = json.load(f)
-            
-        print(f"Đang xóa {len(old_ids)} tin nhắn cũ...")
-        for msg_id in old_ids:
-            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
-            requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "message_id": msg_id})
+        resp = requests.post(url_send, json={"chat_id": TELEGRAM_CHAT_ID, "text": "⏳ Đang làm sạch màn hình..."}).json()
+        
+        if not resp.get("ok"):
+            print("Lỗi không gửi được tin mồi:", resp)
+            return
+
+        current_id = resp['result']['message_id']
+        
+        # 2. Vòng lặp xóa ngược từ ID hiện tại về quá khứ
+        # Xóa ID tin mồi + 99 tin trước đó
+        for i in range(current_id, current_id - DELETE_LIMIT, -1):
+            url_del = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
+            requests.post(url_del, json={"chat_id": TELEGRAM_CHAT_ID, "message_id": i})
             
     except Exception as e:
-        print(f"Lỗi khi đọc/xóa lịch sử: {e}")
+        print(f"Lỗi dọn dẹp: {e}")
 
-def gui_va_luu_id(ds_tin_nhan):
-    # Gửi tin mới và lưu lại ID của chúng
-    sent_ids = []
-    
+def gui_tin_nhan(ds_tin_nhan):
     for msg in ds_tin_nhan:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         data = {
             "chat_id": TELEGRAM_CHAT_ID, 
             "text": msg, 
             "disable_web_page_preview": True,
-            "parse_mode": "Markdown" # Để hiển thị in đậm
+            "parse_mode": "Markdown"
         }
-        try:
-            response = requests.post(url, json=data)
-            resp_data = response.json()
-            if resp_data.get("ok"):
-                # Lưu lại ID của tin nhắn vừa gửi
-                sent_ids.append(resp_data["result"]["message_id"])
-        except Exception as e:
-            print(f"Lỗi gửi tin: {e}")
-
-    # Ghi đè vào file history.json cho ngày mai dùng
-    with open(HISTORY_FILE, 'w') as f:
-        json.dump(sent_ids, f)
-    print(f"Đã lưu {len(sent_ids)} ID tin nhắn vào sổ tay.")
+        requests.post(url, json=data)
 
 def xu_ly_tin_tuc():
     ngay = datetime.datetime.now().strftime("%d/%m/%Y")
@@ -132,27 +120,19 @@ def xu_ly_tin_tuc():
                 feed = feedparser.parse(url)
                 for entry in feed.entries:
                     if count >= LIMIT_PER_CAT: break
-                    
-                    title = entry.title
                     link = entry.link
-                    
                     if link in collected_links: continue
                     
-                    # Lọc từ khóa
                     keywords = muc.get('keywords', [])
                     desc_raw = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
                     desc_clean = clean_html(desc_raw)
                     
                     if keywords:
-                        text_check = (title + " " + desc_clean).lower()
-                        if not any(k in text_check for k in keywords):
-                            continue
+                        text_check = (entry.title + " " + desc_clean).lower()
+                        if not any(k in text_check for k in keywords): continue
                     
-                    # Lấy giờ
                     time_str = convert_time(entry)
-                    
-                    # Tạo tin nhắn có Giờ
-                    news_item = f"\n🕒 `{time_str}` | [{title}]({link})\n"
+                    news_item = f"\n🕒 `{time_str}` | [{entry.title}]({link})\n"
                     
                     if len(current_msg) + len(news_item) > 3800:
                         messages_queue.append(current_msg)
@@ -177,14 +157,14 @@ def main():
         print("Chưa cấu hình Token!")
         return
     
-    # 1. Xóa tin cũ của ngày hôm qua
-    xoa_tin_nhan_cu()
+    # Bước 1: Quét sạch tin nhắn cũ trước
+    don_dep_chat()
     
-    # 2. Tạo tin mới
+    # Bước 2: Gom tin mới
     ds_tin = xu_ly_tin_tuc()
     
-    # 3. Gửi và lưu ID mới vào sổ
-    gui_va_luu_id(ds_tin)
+    # Bước 3: Gửi tin mới
+    gui_tin_nhan(ds_tin)
 
 if __name__ == "__main__":
     main()
