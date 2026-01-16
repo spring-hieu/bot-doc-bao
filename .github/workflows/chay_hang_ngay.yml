@@ -1,0 +1,25 @@
+name: Bot Chạy Hàng Ngày
+
+on:
+  schedule:
+    # Chạy lúc 00:00 UTC (tức là 7:00 sáng Việt Nam)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Cho phép bấm nút chạy thử thủ công
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tải code về máy ảo
+        uses: actions/checkout@v2
+
+      - name: Cài đặt Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Cài thư viện cần thiết
+        run: pip install -r requirements.txt
+
+      - name: Chạy file code main.py
+        run: python main.py
