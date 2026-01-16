@@ -2,26 +2,27 @@ name: Bot Chạy Hàng Ngày
 
 on:
   schedule:
-    # Chạy lúc 00:00 UTC (tức là 7:00 sáng Việt Nam)
-    - cron: '0 0 * * *'
-  workflow_dispatch: # Cho phép bấm nút chạy thử thủ công
+    - cron: '0 0 * * *' # 7h sáng VN
+  workflow_dispatch:
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
-      - name: Tải code về máy ảo
-        uses: actions/checkout@v2
+      - name: Tải code
+        uses: actions/checkout@v3
 
-      - name: Cài đặt Python
-        uses: actions/setup-python@v2
+      - name: Cài đặt Python 3.10
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10' 
+          # Đã nâng lên 3.10 để Google không cảnh báo nữa
 
-      - name: Cài thư viện cần thiết
+      - name: Cài thư viện
         run: pip install -r requirements.txt
 
-      - name: Chạy file code main.py
+      - name: Chạy Bot
+        # ĐOẠN QUAN TRỌNG NHẤT LÀ ĐÂY 👇
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
