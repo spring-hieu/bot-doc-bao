@@ -5,6 +5,10 @@ on:
     - cron: '0 0 * * *' # 7h sáng VN
   workflow_dispatch:
 
+# CẤP QUYỀN GHI FILE (QUAN TRỌNG)
+permissions:
+  contents: write
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
@@ -12,19 +16,25 @@ jobs:
       - name: Tải code
         uses: actions/checkout@v3
 
-      - name: Cài đặt Python 3.10
+      - name: Cài đặt Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10' 
-          # Đã nâng lên 3.10 để Google không cảnh báo nữa
+          python-version: '3.10'
 
       - name: Cài thư viện
-        run: pip install -r requirements.txt
+        run: pip install requests feedparser beautifulsoup4
 
-      - name: Chạy Bot
-        # ĐOẠN QUAN TRỌNG NHẤT LÀ ĐÂY 👇
+      - name: Chạy Bot và Lưu Lịch sử
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python main.py
+
+      - name: Lưu file history.json lên GitHub
+        run: |
+          git config --global user.name "Bot Doc Bao"
+          git config --global user.email "bot@github.com"
+          git add history.json
+          # Nếu có thay đổi thì mới commit, không thì thôi để tránh lỗi
+          git commit -m "Update history tin nhan" || echo "Không có gì thay đổi"
+          git push
