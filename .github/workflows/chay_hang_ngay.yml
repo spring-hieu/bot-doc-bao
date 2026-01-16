@@ -3,11 +3,7 @@ name: Bot Chạy Hàng Ngày
 on:
   schedule:
     - cron: '0 0 * * *' # 7h sáng VN
-  workflow_dispatch:
-
-# CẤP QUYỀN GHI FILE (QUAN TRỌNG)
-permissions:
-  contents: write
+  workflow_dispatch: # Nút chạy thủ công
 
 jobs:
   run-bot:
@@ -24,17 +20,8 @@ jobs:
       - name: Cài thư viện
         run: pip install requests feedparser beautifulsoup4
 
-      - name: Chạy Bot và Lưu Lịch sử
+      - name: Chạy Bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
-
-      - name: Lưu file history.json lên GitHub
-        run: |
-          git config --global user.name "Bot Doc Bao"
-          git config --global user.email "bot@github.com"
-          git add history.json
-          # Nếu có thay đổi thì mới commit, không thì thôi để tránh lỗi
-          git commit -m "Update history tin nhan" || echo "Không có gì thay đổi"
-          git push
